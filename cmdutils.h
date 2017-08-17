@@ -34,6 +34,11 @@
 #undef main /* We don't want SDL to override our main() */
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /**
  * program name, defined by the program for show_version().
  */
@@ -263,7 +268,7 @@ void show_help_options(const OptionDef *options, const char *msg, int req_flags,
  * Show help for all options with given flags in class and all its
  * children.
  */
-void show_help_children(const AVClass *class, int flags);
+void show_help_children(const AVClass *class_, int flags);
 
 /**
  * Per-fftool specific help handler. Implemented in each
@@ -658,5 +663,9 @@ void *grow_array(void *array, int elem_size, int *size, int new_size);
     av_get_channel_layout_string(name, sizeof(name), 0, ch_layout);
 
 double get_rotation(AVStream *st);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CMDUTILS_H */

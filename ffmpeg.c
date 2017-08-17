@@ -2163,6 +2163,8 @@ static int ifilter_send_frame(InputFilter *ifilter, AVFrame *frame)
         need_reinit |= ifilter->sample_rate    != frame->sample_rate ||
                        ifilter->channels       != frame->channels ||
                        ifilter->channel_layout != frame->channel_layout;
+        if (need_reinit)
+          av_log(NULL, AV_LOG_ERROR, "need_reinit because sample_rate %d != %d or chans %d != %d\n", ifilter->sample_rate, frame->sample_rate, ifilter->channels, frame->channels);
         break;
     case AVMEDIA_TYPE_VIDEO:
         need_reinit |= ifilter->width  != frame->width ||
@@ -4546,7 +4548,38 @@ static int transcode_step(void)
             ost->unavailable = 1;
         return 0;
     }
+    
+	/*
+    static FILE * inputEs = NULL;
+    if (inputEs == NULL)
+     inputEs = fopen("E:\\good.es", "rb");
+    
+	unsigned char transcode_header[128] = {0};
+    size_t size_read = fread(transcode_header, 1, sizeof(transcode_header), inputEs);
+    if (size_read != sizeof(transcode_header))
+        return AVERROR_EOF; // end
+    size_t packet_size = transcode_header[24] | transcode_header[25] << 8 | transcode_header[26] <16 | transcode_header[27] < 24;
+    int64_t pts = transcode_header[8] | transcode_header[9] << 8 | transcode_header[10] << 16 | transcode_header[11] << 24 |
+                  transcode_header[12] << 32 | transcode_header[9] << 40 | transcode_header[10] << 48 | transcode_header[11] << 56;
+    int64_t dts = transcode_header[8] | transcode_header[9] << 8 | transcode_header[10] << 16 | transcode_header[11] << 24 |
+                  transcode_header[12] << 32 | transcode_header[9] << 40 | transcode_header[10] << 48 | transcode_header[11] << 56;
+                  
+    if (packet_size > 0xFFFF)
+    {
+      return -1;
+    }  // worsk
 
+    unsigned char es[0xFFFF];
+    size_read = fread(es, 1, packet_size, inputEs);
+    if (size_read != packet_size)
+        return -2; // error
+        
+	AVFrame frame;
+	memset(&frame, 0, sizeof(frame));
+	frame.pts = pts;
+	special_send_frame_to_filters(ist, &frame);
+    */
+        
     if (ret < 0)
         return ret == AVERROR_EOF ? 0 : ret;
 

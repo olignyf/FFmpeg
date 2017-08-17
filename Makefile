@@ -15,6 +15,7 @@ vpath %.cu   $(SRC_PATH)
 vpath %.ptx  $(SRC_PATH)
 vpath %/fate_config.sh.template $(SRC_PATH)
 
+AVPROGS-$(CONFIG_CONVERTER)   += converter
 AVPROGS-$(CONFIG_FFMPEG)   += ffmpeg
 AVPROGS-$(CONFIG_FFPLAY)   += ffplay
 AVPROGS-$(CONFIG_FFPROBE)  += ffprobe
@@ -24,12 +25,14 @@ AVPROGS    := $(AVPROGS-yes:%=%$(PROGSSUF)$(EXESUF))
 INSTPROGS   = $(AVPROGS-yes:%=%$(PROGSSUF)$(EXESUF))
 PROGS      += $(AVPROGS)
 
-AVBASENAMES  = ffmpeg ffplay ffprobe ffserver
+AVBASENAMES  = converter ffmpeg ffplay ffprobe ffserver
 ALLAVPROGS   = $(AVBASENAMES:%=%$(PROGSSUF)$(EXESUF))
 ALLAVPROGS_G = $(AVBASENAMES:%=%$(PROGSSUF)_g$(EXESUF))
 
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog) += cmdutils.o))
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog)-$(CONFIG_OPENCL) += cmdutils_opencl.o))
+
+OBJS-converter                += converter.o converter_opt.o converter/toolbox.o converter/toolbox-tree.o converter/toolbox-filesystem.o converter/toolbox-flexstring.o converter/toolbox-text-buffer-reader.o converter/toolbox-text-file-reader.o
 
 OBJS-ffmpeg                   += ffmpeg_opt.o ffmpeg_filter.o ffmpeg_hw.o
 OBJS-ffmpeg-$(CONFIG_VIDEOTOOLBOX) += ffmpeg_videotoolbox.o
@@ -66,7 +69,7 @@ all: all-yes
 include $(SRC_PATH)/tools/Makefile
 include $(SRC_PATH)/ffbuild/common.mak
 
-FF_EXTRALIBS := $(FFEXTRALIBS)
+FF_EXTRALIBS := $(FFEXTRALIBS) Winmm.lib
 FF_DEP_LIBS  := $(DEP_LIBS)
 FF_STATIC_DEP_LIBS := $(STATIC_DEP_LIBS)
 
@@ -83,6 +86,7 @@ tools/sofa2wavs$(EXESUF): ELIBS = $(FF_EXTRALIBS)
 tools/uncoded_frame$(EXESUF): $(FF_DEP_LIBS)
 tools/uncoded_frame$(EXESUF): ELIBS = $(FF_EXTRALIBS)
 tools/target_dec_%_fuzzer$(EXESUF): $(FF_DEP_LIBS)
+converter: Winmm.lib
 
 CONFIGURABLE_COMPONENTS =                                           \
     $(wildcard $(FFLIBS:%=$(SRC_PATH)/lib%/all*.c))                 \
@@ -135,7 +139,6 @@ ffprobe.o cmdutils.o libavcodec/utils.o libavformat/utils.o libavdevice/avdevice
 
 $(PROGS): %$(PROGSSUF)$(EXESUF): %$(PROGSSUF)_g$(EXESUF)
 	$(CP) $< $@
-	$(STRIP) $@
 
 %$(PROGSSUF)_g$(EXESUF): %.o $(FF_DEP_LIBS)
 	$(LD) $(LDFLAGS) $(LDEXEFLAGS) $(LD_O) $(OBJS-$*) $(FF_EXTRALIBS)
@@ -167,6 +170,7 @@ install-progs-$(CONFIG_SHARED): install-libs
 install-progs: install-progs-yes $(AVPROGS)
 	$(Q)mkdir -p "$(BINDIR)"
 	$(INSTALL) -c -m 755 $(INSTPROGS) "$(BINDIR)"
+	$(INSTALL) -c -m 755 ffmpeg_g.* "$(BINDIR)"
 
 install-data: $(DATA_FILES) $(EXAMPLES_FILES)
 	$(Q)mkdir -p "$(DATADIR)/examples"
