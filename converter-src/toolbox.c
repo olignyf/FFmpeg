@@ -31,7 +31,6 @@
 #       endif
 #       include <mmsystem.h>
 #   else
-#       include "sys/time.h"
 #       include <dirent.h>
 #   endif
 #endif
@@ -41,6 +40,10 @@
 
 #if defined(_MSC_VER) && !defined(__TOOLBOX_NETWORK_H__)
 #   include <windows.h>
+#else
+#   include <sys/unistd.h>
+#   include <sys/time.h>
+#   include <utime.h>
 #endif
 
 #if C_TOOLBOX_LOG_COMMAND == 1
@@ -596,6 +599,8 @@ int C_GetTempFilename(const char * path, char * out_filename)
 {
 #if defined(_MSC_VER)
     char temp[256]="";
+#else
+    int outfd;
 #endif
 
 
@@ -631,7 +636,7 @@ int C_GetTempFilename(const char * path, char * out_filename)
     strcat(out_filename, temp);
 #else
     // linux
-    int outfd;
+
     if ( path )
     {
         strcpy(out_filename, path);

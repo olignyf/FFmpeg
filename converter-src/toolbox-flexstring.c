@@ -20,6 +20,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 
 int flexstrcpy(flexString_T * base, const char * str)

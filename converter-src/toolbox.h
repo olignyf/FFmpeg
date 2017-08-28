@@ -138,8 +138,10 @@ typedef int BOOL;
 
 int TOOLBOX_endSlashDirectory(char * directory_inout); // prepare directory to have filename appended
 
-int wchar_extract_path(const wchar_t * source, wchar_t * destination, int destination_size);
-int wchar_extract_filename(const wchar_t * source, wchar_t * destination, int destination_size);
+int char_extract_path(const char * source, char * destination, int destination_size);
+int char_extract_filename(const char * source, char * destination, int destination_size);
+int buffer_to_file(const char * buffer, const char * filename);
+int C_endSlashDirectory(char * directory_inout);
 
 // convert &quot; to " and more
 int TOOLBOX_DecodeXmlTextBlobs(char * source, char ** temp, unsigned int * temp_size);
@@ -149,6 +151,7 @@ int TOOLBOX_DecodeXmlTextBlobs(char * source, char ** temp, unsigned int * temp_
 // other parameters are mandatory
 int C_Append(char ** string, unsigned int * buffersize, const char * append, int max_length, const char * separator);
 int C_AppendUtf8toWide(wchar_t ** string, unsigned int * buffersize, const char * append, int max_length, const wchar_t * separator, unsigned int * appendedLength);
+char * C_utf8EndOfString(const char * utf8, int utf8_buffer_size);
 
 #if C_TOOLBOX_LOG_COMMAND == 1
 extern FILE * g_toolbox_toolbox_log_file;

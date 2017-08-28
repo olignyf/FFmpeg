@@ -1,5 +1,7 @@
 // Written 10.Apr.2015
 
+#define _GNU_SOURCE // to fix error: ‘DT_REG’ undeclared (first use in this function)
+
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -17,8 +19,8 @@
 #include "toolbox-filesystem.h"
 
 
-#if defined(_MSC_VER)
 
+const char * GetBaseName(const char * fullpath);
 const char * GetBaseName(const char * fullpath)
 {
     char * strRet = strrchr(fullpath, '\\');
@@ -26,7 +28,6 @@ const char * GetBaseName(const char * fullpath)
 
     return strRet+1;
 }
-#endif
 
 int traverseDir(const char* directory, fileEntryCallback_func f_callback, void * opaque1, void * opaque2, int includeHidden)
 {

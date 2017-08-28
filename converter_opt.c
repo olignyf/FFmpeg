@@ -5,7 +5,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/stat.h>
-#include "converter/toolbox.h"
+#include "converter-src/toolbox.h"
+#include "cmdutils.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -34,6 +35,10 @@
 #include <signal.h>
 
 #define WEB_API_LARGE_STRING 1024
+
+
+const char program_name[] = "converter";
+const int program_birth_year = 2017;
 
 static int no_launch;
 

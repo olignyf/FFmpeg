@@ -3,12 +3,12 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
-#include <inttypes.h>
 #include <sys/stat.h>
-#include "converter/toolbox.h"
- 
+#include "converter-src/toolbox.h"
+
 #include <string.h>
-#include <stdlib.h>
+#include <strings.h> // strcasecmp
+#include <stdlib.h> 
 #include <stdio.h>
 #include "libavformat/avformat.h"
 /* FIXME: those are internal headers, ffserver _really_ shouldn't use them */
@@ -35,12 +35,11 @@
 #include <signal.h>
 
 #include "cmdutils.h"
+#include <inttypes.h>
 
 
 #define WEB_API_LARGE_STRING 1024
 
-const char program_name[] = "converter";
-const int program_birth_year = 2017;
 
 
 
@@ -181,8 +180,8 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
                 printf("]\n");
             }
 
-            fputs(",\"size\":\"", stdout);
-            printf("%"PRIu64, node->size);
+            fputs(",\"size\":\"", stdout);            
+//            av_log(NULL, AV_LOG_VERBOSE, "%"PRIu64" ", node->size);
             fputs("\"", stdout);
 
             
@@ -261,5 +260,7 @@ int main(char * argv, int argc)
     printf("]");
 
     genericTree_Destructor(&genericTree);
+    
+    return 0;
 }
 

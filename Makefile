@@ -32,7 +32,7 @@ ALLAVPROGS_G = $(AVBASENAMES:%=%$(PROGSSUF)_g$(EXESUF))
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog) += cmdutils.o))
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog)-$(CONFIG_OPENCL) += cmdutils_opencl.o))
 
-OBJS-converter                += converter.o converter_opt.o converter/toolbox.o converter/toolbox-tree.o converter/toolbox-filesystem.o converter/toolbox-flexstring.o converter/toolbox-text-buffer-reader.o converter/toolbox-text-file-reader.o
+OBJS-converter                += converter.o converter_opt.o converter-src/toolbox.o converter-src/toolbox-tree.o converter-src/toolbox-filesystem.o converter-src/toolbox-flexstring.o converter-src/toolbox-text-buffer-reader.o converter-src/toolbox-text-file-reader.o
 
 OBJS-ffmpeg                   += ffmpeg_opt.o ffmpeg_filter.o ffmpeg_hw.o
 OBJS-ffmpeg-$(CONFIG_VIDEOTOOLBOX) += ffmpeg_videotoolbox.o
@@ -69,7 +69,7 @@ all: all-yes
 include $(SRC_PATH)/tools/Makefile
 include $(SRC_PATH)/ffbuild/common.mak
 
-FF_EXTRALIBS := $(FFEXTRALIBS) Winmm.lib
+FF_EXTRALIBS := $(FFEXTRALIBS) 
 FF_DEP_LIBS  := $(DEP_LIBS)
 FF_STATIC_DEP_LIBS := $(STATIC_DEP_LIBS)
 
@@ -86,7 +86,11 @@ tools/sofa2wavs$(EXESUF): ELIBS = $(FF_EXTRALIBS)
 tools/uncoded_frame$(EXESUF): $(FF_DEP_LIBS)
 tools/uncoded_frame$(EXESUF): ELIBS = $(FF_EXTRALIBS)
 tools/target_dec_%_fuzzer$(EXESUF): $(FF_DEP_LIBS)
-converter: Winmm.lib
+
+ifeq ($(UNAME), mingw64)
+	converter: Winmm.lib
+endif
+
 
 CONFIGURABLE_COMPONENTS =                                           \
     $(wildcard $(FFLIBS:%=$(SRC_PATH)/lib%/all*.c))                 \

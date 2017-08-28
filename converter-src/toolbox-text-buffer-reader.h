@@ -23,6 +23,8 @@
 #include "toolbox-basic-types.h"
 #include "toolbox-errors.h"
 
+#define USE_MUTEX 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif

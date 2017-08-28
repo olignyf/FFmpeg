@@ -21,8 +21,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define USE_MUTEX 0
-
 #include "toolbox-text-buffer-reader.h"
 #include "toolbox.h" // for C_strlen only
 
