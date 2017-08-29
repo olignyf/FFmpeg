@@ -1,3 +1,4 @@
+// ./configure --enable-asm --enable-yasm --disable-ffserver --disable-avdevice --disable-doc --disable-ffplay --disable-ffprobe --disable-shared --disable-bzlib --disable-libopenjpeg --disable-iconv --disable-zlib --enable-debug
 // instream.exe --read file:///c:\\dev\\0.ts --vfvideo-mode 2
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,6 +22,8 @@
 #include "libavutil/parseutils.h"
 #include "libavutil/opt.h"
 #include "libavutil/time.h"
+
+#include "converter_opt.h"
 
 #include <stdarg.h>
 #if HAVE_UNISTD_H
@@ -194,7 +197,9 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
               if (tsCheck)
               {
                 int ret, status;
+                char * output = NULL;
                 unsigned char buffer[188*2];
+                char output_filename[1024];
                 memset(buffer,0,sizeof(buffer));
                 size_t size_read = fread(buffer,1,sizeof(buffer),tsCheck);
                 if (buffer[0] == 0x47 && buffer[188] == 0x47)
@@ -207,10 +212,22 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
 				   // - y force yes overwrite
                    char output[0xFFFF] = "";
 				   int stderrOnly = 1;
+				   strcpy(output_filename, name);
+				   strcat(output_filename, "-fixed.ts");
+				   snprintf(command, sizeof(command) - 1, "tsmuxer -i \"%s\" -o \"%s\"", name, output_filename); 
 				   ret = C_System2(command, output, sizeof(output), &status, stderrOnly);
                    if (strstr(output, "PES packet size mismatch"))
                    {
                       printf("YES broken\n");
+                      ret = C_System(command, &output, &status);
+                      if (ret & status == 0)
+                      {
+                         printf("Success converting\n");
+                      }
+                      else
+                      {
+                         printf("Error converting status = %d\n", status);
+                      }  
                    }
 				   else
 				   {
@@ -232,7 +249,7 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
 }
 
 
-int main(char * argv, int argc)
+int main(int argc, char ** argv)
 {
 
 #if ( defined(_MSC_VER) )
@@ -243,7 +260,23 @@ int main(char * argv, int argc)
     char szLargeBuffer[WEB_API_LARGE_STRING] = "";
     genericTree_T genericTree;
     uint64_t totalSize = 0;
-    int iret;
+    int iret, ret;
+    
+    //show_banner(argc, argv, options);
+
+    if (argc <= 1)
+    {
+        printf("Usage: \nconverter <directory> %d\n", argc);
+        exit(0);
+    }
+    
+    if (strlen(argv[1]) > WEB_API_LARGE_STRING)
+    {
+        printf("Error: to large directory string length\n");
+        exit(0);
+    }
+    
+    strcpy(path, argv[1]); 
 
     szLargeBuffer[sizeof(szLargeBuffer)-1] = '\0';
     genericTree_Constructor(&genericTree);
