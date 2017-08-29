@@ -1,4 +1,4 @@
-// ./configure --enable-asm --enable-yasm --disable-ffserver --disable-avdevice --disable-doc --disable-ffplay --disable-ffprobe --disable-shared --disable-bzlib --disable-libopenjpeg --disable-iconv --disable-zlib --enable-debug
+// ./configure --enable-x86asm  --enable-yasm --disable-ffserver --disable-avdevice --disable-doc --disable-ffplay --disable-ffprobe --disable-shared --disable-bzlib --disable-libopenjpeg --disable-iconv --disable-zlib --enable-debug
 // instream.exe --read file:///c:\\dev\\0.ts --vfvideo-mode 2
 #include <stdlib.h>
 #include <stdio.h>

@@ -116,6 +116,7 @@ Program options:
   --disable-ffplay         disable ffplay build
   --disable-ffprobe        disable ffprobe build
   --disable-ffserver       disable ffserver build
+  --disable-converter       disable converter build
 
 Documentation options:
   --disable-doc            do not build documentation
@@ -1656,6 +1657,7 @@ PROGRAM_LIST="
     ffprobe
     ffserver
     ffmpeg
+    converter
 "
 
 SUBSYSTEM_LIST="
