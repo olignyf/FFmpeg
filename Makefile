@@ -32,7 +32,7 @@ ALLAVPROGS_G = $(AVBASENAMES:%=%$(PROGSSUF)_g$(EXESUF))
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog) += cmdutils.o))
 $(foreach prog,$(AVBASENAMES),$(eval OBJS-$(prog)-$(CONFIG_OPENCL) += cmdutils_opencl.o))
 
-OBJS-converter                += converter.o converter_opt.o converter-src/toolbox.o converter-src/toolbox-tree.o converter-src/toolbox-filesystem.o converter-src/toolbox-flexstring.o converter-src/toolbox-text-buffer-reader.o converter-src/toolbox-text-file-reader.o
+OBJS-converter                += converter_opt.o converter-src/toolbox.o converter-src/toolbox-tree.o converter-src/toolbox-filesystem.o converter-src/toolbox-flexstring.o converter-src/toolbox-text-buffer-reader.o converter-src/toolbox-text-file-reader.o
 
 OBJS-ffmpeg                   += ffmpeg_opt.o ffmpeg_filter.o ffmpeg_hw.o
 OBJS-ffmpeg-$(CONFIG_VIDEOTOOLBOX) += ffmpeg_videotoolbox.o
@@ -174,7 +174,7 @@ install-progs-$(CONFIG_SHARED): install-libs
 install-progs: install-progs-yes $(AVPROGS)
 	$(Q)mkdir -p "$(BINDIR)"
 	$(INSTALL) -c -m 755 $(INSTPROGS) "$(BINDIR)"
-	$(INSTALL) -c -m 755 ffmpeg_g.* "$(BINDIR)"
+	$(INSTALL) -c -m 755 ffmpeg_g* "$(BINDIR)"
 
 install-data: $(DATA_FILES) $(EXAMPLES_FILES)
 	$(Q)mkdir -p "$(DATADIR)/examples"
