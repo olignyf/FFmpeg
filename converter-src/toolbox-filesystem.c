@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h> // for free disk space
+//#include <libexplain/statvfs.h>
 
 #if ( defined(_MSC_VER) )
 #   include "dirent.h" // local implementation by Kevlin Henney (kevlin@acm.org, kevlin@curbralan.com)
@@ -97,4 +99,42 @@ int traverseDir(const char* directory, fileEntryCallback_func f_callback, void *
 
     closedir (pRecordDir);
     return 1;
+}
+
+
+int getDiskSpace(const char *szPath, uint64_t *pnUserAvailable, uint64_t *pnRootAvailable, uint64_t *pnTotalCapacity)
+{
+    int retVal = 0;
+    int             iErrCode;
+    struct statvfs  Stats;
+//    char            szBuffer[MAX_ERRNO_STRING_SIZE];
+
+    iErrCode = statvfs(szPath, &Stats);
+    if (iErrCode == 0) 
+    {
+        if (pnRootAvailable != NULL)
+        {
+            *pnRootAvailable = (uint64_t)Stats.f_bfree * (uint64_t)Stats.f_bsize;
+        }
+
+        if (pnUserAvailable != NULL)
+        {
+            *pnUserAvailable = (uint64_t)Stats.f_bavail * (uint64_t)Stats.f_bsize;
+        }
+
+        if (pnTotalCapacity != NULL)
+        {
+
+            *pnTotalCapacity = (uint64_t)Stats.f_blocks * (uint64_t)Stats.f_frsize;
+        }
+
+        retVal = 1;
+    }
+    else
+    {
+        printf("ERROR: statvfs failed, errno=%d\n", errno);
+        retVal = -11;
+    }
+
+    return retVal;
 }

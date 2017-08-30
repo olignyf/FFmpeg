@@ -41,10 +41,10 @@
 #include <inttypes.h>
 
 
-#define WEB_API_LARGE_STRING 1024
+#define CONVERTER_MAX_PATH 10000
 
 
-
+char g_directory[CONVERTER_MAX_PATH] = "";
 
 // will insert into childs of opaque1 treeItem_T
 // opaque2 is a uint64_t size to add with our own size and any of our children
@@ -56,6 +56,7 @@ static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * o
     uint64_t * pCurrentLevelSize = (uint64_t*)opaque2;
     uint64_t childsSize = 0;
     genericTree_T * tree;
+    int nLength;
 
     if (opaque1 == NULL) return -3;
     if (entry == NULL) return -2;
@@ -69,7 +70,7 @@ static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * o
         return 0;
     }
 
-    int nLength = strlen(name);
+    nLength = strlen(name);
     if (strstr(name, "/mnt/storage1/recordings/") != NULL
      && strcasecmp(&name[nLength - 4], ".mp4") != 0
      && strcasecmp(&name[nLength - 3], ".ts") != 0
@@ -184,7 +185,8 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
             }
 
             fputs(",\"size\":\"", stdout);            
-//            av_log(NULL, AV_LOG_VERBOSE, "%"PRIu64" ", node->size);
+            snprintf(szLargeBuffer, 100, "%"PRIu64, node->size);
+            fputs(szLargeBuffer, stdout);
             fputs("\"", stdout);
 
             
@@ -197,7 +199,6 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
               if (tsCheck)
               {
                 int ret, status;
-                char * output = NULL;
                 unsigned char buffer[188*2];
                 char output_filename[1024];
                 memset(buffer,0,sizeof(buffer));
@@ -207,19 +208,28 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
                    printf("YES ts file\n");
                    
 				   char command[1024] = "";
+#if defined(_MSC_VER) || defined(WIN32)
 				   snprintf(command, sizeof(command) - 1, "C:\\ffmpeg\\bin\\ffmpeg.exe -t 30  -i \"%s\" out.wav -loglevel 56 -y > /dev/null", name); 
+#else
+				   snprintf(command, sizeof(command) - 1, "ffmpeg -t 30  -i \"%s\" out.wav -loglevel 56 -y > /dev/null", name); 
+#endif
 				   // -t 30 to limit to 30 sec worth of input
 				   // - y force yes overwrite
                    char output[0xFFFF] = "";
 				   int stderrOnly = 1;
-				   strcpy(output_filename, name);
-				   strcat(output_filename, "-fixed.ts");
-				   snprintf(command, sizeof(command) - 1, "tsmuxer -i \"%s\" -o \"%s\"", name, output_filename); 
 				   ret = C_System2(command, output, sizeof(output), &status, stderrOnly);
+//				   
                    if (strstr(output, "PES packet size mismatch"))
                    {
                       printf("YES broken\n");
-                      ret = C_System(command, &output, &status);
+	  			      uint64_t nUserAvailable = 0, nRootAvailable = 0, nTotalCapacity = 0;
+                      ret = getDiskSpace(g_directory, &nUserAvailable, &nRootAvailable, &nTotalCapacity);
+                      printf("free space %"PRIu64"\n",nUserAvailable);
+                      stderrOnly = 0;
+				   strcpy(output_filename, name);
+				   strcat(output_filename, "-fixed.ts");
+                      snprintf(command, sizeof(command) - 1, "./tsmuxer -i \"%s\" -o \"%s\" --legacy-audio true", name, output_filename); 
+                      ret = C_System2(command, output, sizeof(output), &status, stderrOnly);
                       if (ret & status == 0)
                       {
                          printf("Success converting\n");
@@ -227,6 +237,7 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
                       else
                       {
                          printf("Error converting status = %d\n", status);
+                         printf("\noutput:%s\n", output);
                       }  
                    }
 				   else
@@ -251,13 +262,7 @@ static void PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, u
 
 int main(int argc, char ** argv)
 {
-
-#if ( defined(_MSC_VER) )
-    char path[WEB_API_LARGE_STRING] = "I:\\testconvert";
-#else
-    char path[WEB_API_LARGE_STRING] = "/home/dev/testconvert";
-#endif
-    char szLargeBuffer[WEB_API_LARGE_STRING] = "";
+    char szLargeBuffer[CONVERTER_MAX_PATH] = "";
     genericTree_T genericTree;
     uint64_t totalSize = 0;
     int iret, ret;
@@ -270,24 +275,25 @@ int main(int argc, char ** argv)
         exit(0);
     }
     
-    if (strlen(argv[1]) > WEB_API_LARGE_STRING)
+    if (strlen(argv[1]) > CONVERTER_MAX_PATH)
     {
         printf("Error: to large directory string length\n");
         exit(0);
     }
     
-    strcpy(path, argv[1]); 
+    strcpy(g_directory, argv[1]); 
+    
 
     szLargeBuffer[sizeof(szLargeBuffer)-1] = '\0';
     genericTree_Constructor(&genericTree);
 
-    iret = traverseDir(path, fileEntryCallback, &genericTree.top, &totalSize, FALSE);
+    iret = traverseDir(g_directory, fileEntryCallback, &genericTree.top, &totalSize, FALSE);
     if (iret <= 0)
     {
-        printf("Failed traverseDir path(%s) with error(%d)\n", path, iret);
+        printf("Failed traverseDir path(%s) with error(%d)\n", g_directory, iret);
     }
 
-    fputs("\"rootPath\":\"", stdout); fputs(path, stdout); fputs("\"", stdout);
+    fputs("\"rootPath\":\"", stdout); fputs(g_directory, stdout); fputs("\"", stdout);
     printf(",\"content\": [");
     PrintRecursive(genericTree.top.childs, 0, szLargeBuffer, sizeof(szLargeBuffer));
     printf("]");

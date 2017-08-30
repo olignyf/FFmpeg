@@ -243,7 +243,7 @@ int C_memFind(unsigned char * input, unsigned int inputLength, unsigned char * n
 int C_duplicateString(const char * input, char ** output, unsigned int * output_size);
 
 #if C_TOOLBOX_TIMING == 1
-unsigned int C_Timestamp();
+unsigned int C_Timestamp(void);
 int C_Timestring(char * loadme, unsigned int loadme_size);
 int C_TimestringW(wchar_t * loadme, unsigned int loadme_size);
 // year with four letters
