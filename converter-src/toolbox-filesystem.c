@@ -44,7 +44,7 @@ int traverseDir(const char* directory, fileEntryCallback_func f_callback, void *
     if (directory == NULL) return -1;
     if (f_callback == NULL) return -2;
 
-    printf("Called for dir \"%s\".\n", directory);
+    //printf("Called for dir \"%s\".\n", directory);
     pRecordDir = opendir(directory);
     if (pRecordDir == NULL)
     {
