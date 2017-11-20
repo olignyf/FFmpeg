@@ -536,25 +536,25 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
 #endif
                          // -t 30 to limit to 30 sec worth of input
                          // - y force yes overwrite
-                         unsigned int output_size = 0xFFFF;
+                         unsigned int output_size = 0x1FFFF;
                          char * output = malloc(output_size*sizeof(char));
-                         output[0] = output[output_size-1] = '\0';
+                         memset(output, 0, output_size*sizeof(char));
                          int stderrOnly = 1;
                          printf("executing cmd %s\n", command);
                          ret = C_System2(command, output, output_size, &system_status, stderrOnly);
-      //               
+
                          if (system_status)
                          {
                             printf("cmd status %d\n", system_status);
                          }
-                         printf("cmd %s\n", output);
+                         //printf("cmd %s\n", output);
                          if (strstr(output, "PES packet size mismatch"))
                          {
-                            printf("YES broken\n");
+                            printf("Yes audio needs convertion\n");
                             
                             uint64_t nUserAvailable = 0, nRootAvailable = 0, nTotalCapacity = 0;
                             ret = getDiskSpace(g_directory, &nUserAvailable, &nRootAvailable, &nTotalCapacity);
-                            printf("free space %"PRIu64"\n",nUserAvailable);
+                            printf("free space %"PRIu64"\n", nUserAvailable);
                             uint64_t sizeNeeded = 2*1.2*node->size;
                             if (nUserAvailable < sizeNeeded)
                             {
@@ -575,12 +575,15 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             ret = C_System2(command, output, output_size, &converter_status, stderrOnly);
                             if (ret & converter_status == 0)
                             {
-                               printf("strlen of output %zu, or 0x%zX\n", strlen(output), strlen(output));
+                               //printf("strlen of output %zu, or 0x%zX\n", strlen(output), strlen(output));
                                int outputStringMaxedOut = output_size -1 == strlen(output);
                                if (strstr(output, "Completed without errors") || outputStringMaxedOut)
                                {
                                  printf("Success converting\n");
-                                 printf("outputStringMaxedOut %d\n", outputStringMaxedOut);
+                                 if (outputStringMaxedOut)
+                                 {
+                                   printf("outputStringMaxedOut %d\n", outputStringMaxedOut);
+                                 }
                                  ret = C_MoveFileEx(name, tmp_filename, TOOLBOX_OVERWRITE_DESTINATION);
                                  if (ret >= 1)
                                  {
@@ -620,6 +623,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             printf("not broken\n");
                             status = "TS file not broken, keeping untouched";
                          }
+                         free(output);
                       }
                       else
                       {
@@ -627,8 +631,13 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                          status = "not TS file";
                       }
                       fclose(tsCheck);
-                    }
-                  }
+                   }
+                 }
+                 else
+                 {
+                    //printf("NOT ts file\n");
+                    status = "not TS file";
+                 }
                }
             }
             
