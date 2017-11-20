@@ -146,7 +146,7 @@ static int utf8_validate(const char *s)
  * and that there are enough characters in front of @s.
  WARNING byte endinenesss
  */
-static int utf8_read_char(const char *s, unsigned char *out)
+static int utf8_read_char(const char *s, uint32_t *out)
 {
 	const unsigned char *c = (const unsigned char*) s;
 	
@@ -188,7 +188,7 @@ static int utf8_read_char(const char *s, unsigned char *out)
  *
  * This function will write up to 4 bytes to @out.
  */
-static int utf8_write_char(unsigned char unicode, char *out)
+static int utf8_write_char(uint32_t unicode, char *out)
 {
 	unsigned char *o = (unsigned char*) out;
 	
@@ -233,7 +233,7 @@ static int utf8_write_char(unsigned char unicode, char *out)
  * @uc should be 0xD800..0xDBFF, and @lc should be 0xDC00..0xDFFF.
  * If they aren't, this function returns false.
  */
-static int from_surrogate_pair(uint16_t uc, uint16_t lc, unsigned char *unicode)
+static int from_surrogate_pair(uint16_t uc, uint16_t lc, uint32_t *unicode)
 {
 	if (uc >= 0xD800 && uc <= 0xDBFF && lc >= 0xDC00 && lc <= 0xDFFF) {
 		*unicode = 0x10000 + ((((unsigned char)uc & 0x3FF) << 10) | (lc & 0x3FF));
@@ -248,7 +248,7 @@ static int from_surrogate_pair(uint16_t uc, uint16_t lc, unsigned char *unicode)
  *
  * @unicode must be U+10000..U+10FFFF.
  */
-static void to_surrogate_pair(unsigned char unicode, uint16_t *uc, uint16_t *lc)
+static void to_surrogate_pair(uint32_t unicode, uint16_t *uc, uint16_t *lc)
 {
 	unsigned char n;
 	
