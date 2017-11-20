@@ -525,7 +525,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                       size_t size_read = fread(buffer,1,sizeof(buffer), tsCheck);
                       if (buffer[0] == 0x47 && buffer[188] == 0x47)
                       {
-                         printf("YES ts file\n");
+                         printf("TS file found %s\n", name);
                          printed_something = 1;
                          
                          char command[1024+CONVERTER_MAX_PATH] = "";
@@ -620,8 +620,8 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                          }
                          else
                          {
-                            printf("not broken\n");
-                            status = "TS file not broken, keeping untouched";
+                            printf("TS file seems ok, keeping untouched\n");
+                            status = "TS file seems ok, keeping untouched";
                          }
                          free(output);
                       }
