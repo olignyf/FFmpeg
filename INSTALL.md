@@ -15,3 +15,9 @@ NOTICE
 ------
 
  - Non system dependencies (e.g. libx264, libvpx) are disabled by default.
+
+#Installing converter + tsmuxer
+
+~/builds/tsmuxer/ort/stage/ffmpeg/lib/* => ./lib-tsmuxer
+~/builds/tsmuxer/stage/instream-linux-x86/lib/libudev.so.0 => ./lib-tsmuxer
+./patchelf --set-rpath '$ORIGIN/lib-tsmuxer' tsmuxer
