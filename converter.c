@@ -555,10 +555,12 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             uint64_t nUserAvailable = 0, nRootAvailable = 0, nTotalCapacity = 0;
                             ret = getDiskSpace(g_directory, &nUserAvailable, &nRootAvailable, &nTotalCapacity);
                             printf("free space %"PRIu64"\n",nUserAvailable);
-                            if (nUserAvailable < 2*1.3*node->size)
+                            uint64_t sizeNeeded = 2*1.2*node->size;
+                            if (nUserAvailable < sizeNeeded)
                             {
                                // not enough disk space
-                               printf("Not enough disk space to continue\n");
+                               uint64_t missing = sizeNeeded - nUserAvailable;
+                               printf("Not enough disk space to continue, free up %"PRId64" MB additional space\n", missing/(1024*1024));
                                exit(10);
                             }
                             
