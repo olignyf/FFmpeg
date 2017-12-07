@@ -10,18 +10,8 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>/*
-#include "libavformat/avformat.h"
+#include <stdio.h>
 
-#include "libavutil/avstring.h"
-#include "libavutil/intreadwrite.h"
-#include "libavutil/mathematics.h"
-#include "libavutil/random_seed.h"
-#include "libavutil/rational.h"
-#include "libavutil/parseutils.h"
-#include "libavutil/opt.h"
-#include "libavutil/time.h"
-*/
 #include <stdarg.h>
 #if HAVE_UNISTD_H
 #include <unistd.h>

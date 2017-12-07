@@ -46,6 +46,11 @@
 
 char g_directory[CONVERTER_MAX_PATH] = "";
 FILE * g_report = NULL;
+int g_file_limit = 0; // will stop at X files. if 0 then no limit
+int g_file_count = 0; // to keep track of file limit
+int g_dry_run = 0; // will not convert and just print report
+int g_csv = 1; // CSV vs JSON
+
 
 
 // Followin UTF8 functions from 
@@ -399,6 +404,23 @@ void PrintJsonValueToFile(const char * value, FILE * file)
   }
 }
 
+void PrintCsvValueToFile(const char * value, FILE * file);
+void PrintCsvValueToFile(const char * value, FILE * file)
+{
+  int len;
+  unsigned int l = strlen(value);
+  for (unsigned i = 0; i<l; i++)
+  {
+    if (value[i] == '"')
+    {  fputs("\"\"", file); // " => ""
+    }
+    else
+    {
+       fputc(value[i], file); // print as-is
+    }
+  }
+}
+
 // will insert into childs of opaque1 treeItem_T
 // opaque2 is a uint64_t size to add with our own size and any of our children
 static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * opaque1, void * opaque2, int includeHidden)
@@ -418,12 +440,13 @@ static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * o
     tree = (genericTree_T *)level->tree;
 
     //printf("name:%s\n", name);
-    if (entry->bIsDir && strcasecmp(name, "/mnt/storage1/recordings/tmp") == 0)
+    if (entry->bIsDir && strcasecmp(name, "/mnt/storage1/recordings/tmp") == 0) // some files to ignore do like this
     {
         return 0;
     }
 
     nLength = strlen(name);
+    /*
     if (strstr(name, "/mnt/storage1/recordings/") != NULL
      && strcasecmp(&name[nLength - 4], ".mp4") != 0
      && strcasecmp(&name[nLength - 3], ".ts") != 0
@@ -431,7 +454,7 @@ static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * o
      )
     {
         return 0;
-    }
+    }*/
 
     iret = genericTree_Insert(tree, level, name, 0, NULL, &newElement);
     if ( iret > 0 && newElement )
@@ -451,7 +474,6 @@ static int fileEntryCallback(const char *name, const FILE_ENTRY *entry, void * o
         }
 
         // get file stats
-        //if ( !entry->bIsDir )
         {
             struct stat fileStats;
             if (stat(name, &fileStats) == 0)
@@ -492,13 +514,19 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
     int system_status = 0;
     int converter_status = 0;
     const char * status = "";
-    //uint64_t childSize = 0;
+    //uint64_t childSize = 0; 
+
+    if (g_file_limit > 0 && g_file_count >= g_file_limit)
+    {
+        return 0;
+    }
 
     // loop current node level
     while (item)
     {
         FILE_ENTRY * node = (FILE_ENTRY*)item->client;
 
+        printed_something = 0;
         if (node)
         {
             name = flexget(&item->name);
@@ -547,6 +575,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                          {
                             printf("cmd status %d\n", system_status);
                          }
+                         
                          //printf("cmd %s\n", output);
                          if (strstr(output, "PES packet size mismatch"))
                          {
@@ -554,13 +583,15 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             
                             uint64_t nUserAvailable = 0, nRootAvailable = 0, nTotalCapacity = 0;
                             ret = getDiskSpace(g_directory, &nUserAvailable, &nRootAvailable, &nTotalCapacity);
-                            printf("free space %"PRIu64"\n", nUserAvailable);
+                            printf("Free space: %"PRIu64" bytes\n", nUserAvailable);
                             uint64_t sizeNeeded = 2*1.2*node->size;
                             if (nUserAvailable < sizeNeeded)
                             {
                                // not enough disk space
                                uint64_t missing = sizeNeeded - nUserAvailable;
                                printf("Not enough disk space to continue, free up %"PRId64" MB additional space\n", missing/(1024*1024));
+                               printf("After freeing up space, re-run this program to continue where it left off\n");
+                               printf("Output written to report.txt\n");
                                exit(10);
                             }
                             
@@ -570,52 +601,60 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             strcat(tmp_filename, ".ori");
                             snprintf(command, sizeof(command) - 1, "./tsmuxer -i \"%s\" -o \"%s\" --legacy-audio true", name, output_filename); 
                             printf("command %s\n", command);
+                            g_file_count++;
                             
-                            stderrOnly = 0;
-                            ret = C_System2(command, output, output_size, &converter_status, stderrOnly);
-                            if (ret & converter_status == 0)
+                            if (g_dry_run)
                             {
-                               //printf("strlen of output %zu, or 0x%zX\n", strlen(output), strlen(output));
-                               int outputStringMaxedOut = output_size -1 == strlen(output);
-                               if (strstr(output, "Completed without errors") || outputStringMaxedOut)
-                               {
-                                 printf("Success converting\n");
-                                 if (outputStringMaxedOut)
-                                 {
-                                   printf("outputStringMaxedOut %d\n", outputStringMaxedOut);
-                                 }
-                                 ret = C_MoveFileEx(name, tmp_filename, TOOLBOX_OVERWRITE_DESTINATION);
-                                 if (ret >= 1)
-                                 {
-                                   ret = C_MoveFileEx(output_filename, name, 0);
-                                   if (ret >= 1)
-                                   {
-                                      printf("Success replacing files\n");
-                                      status = "success converting";
-                                   }
-                                   else
-                                   {  // error
-                                      ret = C_MoveFileEx(tmp_filename, name, TOOLBOX_OVERWRITE_DESTINATION); // restore
-                                      printf("Restoring after error\n");
-                                      status = "error failed to move files after converting";
-                                      
-                                   }
-                                 }
-                                 else
-                                 {
-                                    status = "error failed to rename original file after converting";
-                                 }
-                               }
-                               else
-                               {
-                                  printf("There might have been a problem during convertion, output: %s\n", output);
-                                  status = "error converting, see converter.log for details";
-                               }
+                               status = "needs convertion";
                             }
                             else
                             {
-                               printf("Error converting status = %d\n", converter_status);
-                               printf("\noutput:%s\n", output);
+                                stderrOnly = 0;
+                                ret = C_System2(command, output, output_size, &converter_status, stderrOnly);
+                                if (ret & converter_status == 0)
+                                {
+                                   //printf("strlen of output %zu, or 0x%zX\n", strlen(output), strlen(output));
+                                   int outputStringMaxedOut = output_size -1 == strlen(output);
+                                   if (strstr(output, "Completed without errors") || outputStringMaxedOut)
+                                   {
+                                     printf("Success converting\n");
+                                     if (outputStringMaxedOut)
+                                     {
+                                       printf("outputStringMaxedOut %d\n", outputStringMaxedOut);
+                                     }
+                                     ret = C_MoveFileEx(name, tmp_filename, TOOLBOX_OVERWRITE_DESTINATION);
+                                     if (ret >= 1)
+                                     {
+                                       ret = C_MoveFileEx(output_filename, name, 0);
+                                       if (ret >= 1)
+                                       {
+                                          printf("Success replacing files\n");
+                                          status = "success converting";
+                                       }
+                                       else
+                                       {  // error
+                                          ret = C_MoveFileEx(tmp_filename, name, TOOLBOX_OVERWRITE_DESTINATION); // restore
+                                          printf("Restoring after error\n");
+                                          status = "error failed to move files after converting";
+                                          
+                                       }
+                                     }
+                                     else
+                                     {
+                                        status = "error failed to rename original file after converting";
+                                     }
+                                   }
+                                   else
+                                   {
+                                      printf("There might have been a problem during convertion, output: %s\n", output);
+                                      status = "error converting, see converter.log for details";
+                                   }
+                                }
+                                else
+                                {
+                                   printf("Error converting status = %d\n", converter_status);
+                                   printf("\noutput:%s\n", output);
+                                }
                             }
                          }
                          else
@@ -643,22 +682,40 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
             
             if (node->bIsDir || printed_something) 
             {
-              if (count >= 1) fputs(",", g_report);
-              fputs("{", g_report);
-
-              fputs("\"name\":\"", g_report); //FIXME(sanitize to JSON)
-              if (item->name.buffer) PrintJsonValueToFile(item->name.buffer, g_report);
-              else PrintJsonValueToFile(item->name.fixed, g_report);
-              fputs("\"", g_report);
-
-              fputs(",\"size\":\"", g_report);
-              snprintf(szLargeBuffer, 100, "%"PRIu64, node->size);
-              fputs(szLargeBuffer, g_report);
-              fputs("\"", g_report);
-
-              fputs(",\"isDir\":", g_report);
-              if (node->bIsDir) fputs("true", g_report);
-              else fputs("false", g_report);
+              if (g_csv)
+              {
+                  // print name, then size
+                  if (printed_something)
+                  {
+                      fputs("\"", g_report); //FIXME(sanitize to JSON)
+                      if (item->name.buffer) PrintJsonValueToFile(item->name.buffer, g_report);
+                      else PrintJsonValueToFile(item->name.fixed, g_report);
+                      fputs("\"", g_report);
+        
+                      fputs(",", g_report);
+                      snprintf(szLargeBuffer, 100, "%"PRIu64, node->size);
+                      fputs(szLargeBuffer, g_report);
+                      fputs("", g_report);
+                  }
+              }
+              else
+              {
+                  if (count >= 1) fputs(",", g_report);
+                  fputs("{", g_report);
+                  fputs("\"name\":\"", g_report); //FIXME(sanitize to JSON)
+                  if (item->name.buffer) PrintJsonValueToFile(item->name.buffer, g_report);
+                  else PrintJsonValueToFile(item->name.fixed, g_report);
+                  fputs("\"", g_report);
+    
+                  fputs(",\"size\":\"", g_report);
+                  snprintf(szLargeBuffer, 100, "%"PRIu64, node->size);
+                  fputs(szLargeBuffer, g_report);
+                  fputs("\"", g_report);
+    
+                  fputs(",\"isDir\":", g_report);
+                  if (node->bIsDir) fputs("true", g_report);
+                  else fputs("false", g_report);
+              }
 
               if (node->bIsDir == FALSE && C_strendstr(szLargeBuffer, "manifest"))
               {
@@ -668,41 +725,66 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                 // TODO open manifest here if needed
               }
 
-              szLargeBuffer[0] = '\0';
-              strftime(szLargeBuffer, 100, "%d %b %Y %H:%M:%S GMT", gmtime(&node->ctime));
-              fputs(",\"ctime\":\"", g_report);
-              fputs(szLargeBuffer, g_report);
-              fputs("\"", g_report);
-
-              szLargeBuffer[0] = '\0';
-              strftime(szLargeBuffer, 100, "%d %b %Y %H:%M:%S GMT", gmtime(&node->mtime));
-              fputs(",\"mtime\":\"", g_report);
-              fputs(szLargeBuffer, g_report);
-              fputs("\"", g_report);
               
-              if (converter_status != 0)
+              if (g_csv)
               {
-                fprintf(g_report, ",\"status\":\"error converting, status %d\"", converter_status);
+                if (printed_something)
+                {
+                   if (converter_status != 0)
+                   {
+                     fprintf(g_report, ",\"error converting, status %d\"", converter_status);
+                   }
+                   else
+                   {
+                     fprintf(g_report, ",\"%s\"", status);
+                   }
+                   status = "old status";
+                }
               }
               else
               {
-                fprintf(g_report, ",\"status\":\"%s\"", status);
+                 szLargeBuffer[0] = '\0';
+                 strftime(szLargeBuffer, 100, "%d %b %Y %H:%M:%S GMT", gmtime(&node->ctime));
+                 fputs(",\"ctime\":\"", g_report);
+                 fputs(szLargeBuffer, g_report);
+                 fputs("\"", g_report);
+   
+                 szLargeBuffer[0] = '\0';
+                 strftime(szLargeBuffer, 100, "%d %b %Y %H:%M:%S GMT", gmtime(&node->mtime));
+                 fputs(",\"mtime\":\"", g_report);
+                 fputs(szLargeBuffer, g_report);
+                 fputs("\"", g_report);
+                 if (converter_status != 0)
+                 {
+                   fprintf(g_report, ",\"status\":\"error converting, status %d\"", converter_status);
+                 }
+                 else
+                 {
+                   fprintf(g_report, ",\"status\":\"%s\"", status);
+                 }
               }
 
               if (node->bIsDir && item->childs != NULL)
               {
-                fprintf(g_report, ",\"childs\": [\n");
+                if (!g_csv) fprintf(g_report, ",\"childs\": [\n");
 
                 int subdir_printed = PrintRecursive(item->childs, level+1, szLargeBuffer, szLargeBufferSize);
-                if (printed_something == 0 && subdir_printed)
+                if (printed_something == 0 && subdir_printed && !g_csv)
                 {
                    printed_something = 1;
                 }
 
-                fprintf(g_report, "]");
+                if (!g_csv) fprintf(g_report, "]");
               }
         
-              fputs("}\n", g_report);
+              if (g_csv)
+              {
+                if (printed_something) fputs("\n", g_report);
+              }
+              else
+              {
+                fputs("}\n", g_report);
+              }
             
               count++;
             }
@@ -715,6 +797,35 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
 }
 
 
+int parse_opt(int argc, char ** argv, const char *wanted, int expects_value, int *loadme);
+
+// returns 1 if found
+// returns 0 if not found
+int parse_opt(int argc, char ** argv, const char *wanted, int expects_value, int *loadme)
+{
+   for (int i=1; i<argc; i++)
+   {
+      if (strcmp(argv[i], wanted) == 0)
+      {
+         if (expects_value)
+         {
+           *loadme = atoi(argv[i+1]);
+         }
+         else
+         {
+           *loadme = 1; // present
+         }
+         return 1;
+      }
+   }
+   
+   if (!expects_value)
+   {
+      *loadme = 0; // not present
+   }
+   return 0;
+}
+
 int main(int argc, char ** argv)
 {
     char szLargeBuffer[CONVERTER_MAX_PATH] = "";
@@ -726,7 +837,7 @@ int main(int argc, char ** argv)
 
     if (argc <= 1)
     {
-        printf("Usage: \nconverter <directory>\n");
+        printf("Usage: \nconverter <directory> [--dry-run] [-l <limit>]\n");
         exit(1);
     }
     
@@ -736,7 +847,19 @@ int main(int argc, char ** argv)
         exit(2);
     }
     
-    strcpy(g_directory, argv[1]); 
+    strcpy(g_directory, argv[1]);
+    parse_opt(argc, argv, "--dry-run", 0, &g_dry_run);
+    parse_opt(argc, argv, "-l", 1, &g_file_limit);
+    
+    if (g_dry_run)
+    {
+      printf("Running in dry mode\n");
+    }
+    
+    if (g_file_limit >= 1)
+    {
+      printf("File limit of %d\n", g_file_limit);
+    }
 
     szLargeBuffer[sizeof(szLargeBuffer)-1] = '\0';
     
@@ -751,13 +874,24 @@ int main(int argc, char ** argv)
         printf("Failed traverseDir path(%s) with error(%d)\n", g_directory, iret);
     }
 
-    fputs("{\"rootPath\":\"", g_report); fputs(g_directory, g_report); fputs("\"", g_report);
-    fprintf(g_report, ",\"content\": [");
+    if (g_csv)
+    {
+      fputs("filename,size,status\n", g_report);
+    }
+    else
+    {
+      fputs("{\"rootPath\":\"", g_report); fputs(g_directory, g_report); fputs("\"", g_report);
+      fprintf(g_report, ",\"content\": [");
+    }
     PrintRecursive(genericTree.top.childs, 0, szLargeBuffer, sizeof(szLargeBuffer));
-    fprintf(g_report, "]}");
+    if (g_csv)
+    {
+      fprintf(g_report, "]}");
+    }
 
     genericTree_Destructor(&genericTree);
     fclose(g_report);
+    printf("Output written to report.txt\n");
     return 0;
 }
 
