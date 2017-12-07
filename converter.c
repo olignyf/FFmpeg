@@ -42,7 +42,9 @@
 
 
 #define CONVERTER_MAX_PATH 10000
-
+enum ReturnValues {
+  RET_FILE_LIMIT_REACHED = 100
+};
 
 char g_directory[CONVERTER_MAX_PATH] = "";
 FILE * g_report = NULL;
@@ -50,6 +52,7 @@ int g_file_limit = 0; // will stop at X files. if 0 then no limit
 int g_file_count = 0; // to keep track of file limit
 int g_dry_run = 0; // will not convert and just print report
 int g_csv = 1; // CSV vs JSON
+const char * g_report_filename = "report.csv";
 
 
 
@@ -516,15 +519,16 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
     const char * status = "";
     //uint64_t childSize = 0; 
 
-    if (g_file_limit > 0 && g_file_count >= g_file_limit)
-    {
-        return 0;
-    }
 
     // loop current node level
     while (item)
     {
         FILE_ENTRY * node = (FILE_ENTRY*)item->client;
+       
+        if (g_file_limit > 0 && g_file_count >= g_file_limit)
+        {
+            return RET_FILE_LIMIT_REACHED;
+        }
 
         printed_something = 0;
         if (node)
@@ -591,7 +595,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                                uint64_t missing = sizeNeeded - nUserAvailable;
                                printf("Not enough disk space to continue, free up %"PRId64" MB additional space\n", missing/(1024*1024));
                                printf("After freeing up space, re-run this program to continue where it left off\n");
-                               printf("Output written to report.txt\n");
+                               printf("Output written to %s\n", g_report_filename);
                                exit(10);
                             }
                             
@@ -602,7 +606,6 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             snprintf(command, sizeof(command) - 1, "./tsmuxer -i \"%s\" -o \"%s\" --legacy-audio true", name, output_filename); 
                             printf("command %s\n", command);
                             g_file_count++;
-                            
                             if (g_dry_run)
                             {
                                status = "needs convertion";
@@ -663,6 +666,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                             status = "TS file seems ok, keeping untouched";
                          }
                          free(output);
+                         printf("Amount of file processed %d\n", g_file_count);
                       }
                       else
                       {
@@ -866,7 +870,7 @@ int main(int argc, char ** argv)
     // to hold directory structure
     genericTree_Constructor(&genericTree);
     
-    g_report = fopen("report.txt", "wb");
+    g_report = fopen(g_report_filename, "wb");
 
     iret = traverseDir(g_directory, fileEntryCallback, &genericTree.top, &totalSize, FALSE);
     if (iret <= 0)
@@ -883,15 +887,20 @@ int main(int argc, char ** argv)
       fputs("{\"rootPath\":\"", g_report); fputs(g_directory, g_report); fputs("\"", g_report);
       fprintf(g_report, ",\"content\": [");
     }
-    PrintRecursive(genericTree.top.childs, 0, szLargeBuffer, sizeof(szLargeBuffer));
-    if (g_csv)
+    iret = PrintRecursive(genericTree.top.childs, 0, szLargeBuffer, sizeof(szLargeBuffer));
+    if (iret == RET_FILE_LIMIT_REACHED)
+    {
+       printf("Attained file limit to process (%d), exiting.\n", g_file_limit);
+    }
+    
+    if (!g_csv)
     {
       fprintf(g_report, "]}");
     }
 
     genericTree_Destructor(&genericTree);
     fclose(g_report);
-    printf("Output written to report.txt\n");
+    printf("Output written to %s\n", g_report_filename);
     return 0;
 }
 
