@@ -43,7 +43,8 @@
 
 #define CONVERTER_MAX_PATH 10000
 enum ReturnValues {
-  RET_FILE_LIMIT_REACHED = 100
+  RET_FILE_LIMIT_REACHED = 100,
+  RET_FREE_DISK_SPACE_MISSING
 };
 
 char g_directory[CONVERTER_MAX_PATH] = "";
@@ -52,7 +53,7 @@ int g_file_limit = 0; // will stop at X files. if 0 then no limit
 int g_file_count = 0; // to keep track of file limit
 int g_dry_run = 0; // will not convert and just print report
 int g_csv = 1; // CSV vs JSON
-const char * g_report_filename = "report.csv";
+char g_report_filename[128] = "report.csv";
 
 
 
@@ -555,6 +556,8 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                       char tmp_filename[CONVERTER_MAX_PATH];
                       memset(buffer,0,sizeof(buffer));
                       size_t size_read = fread(buffer,1,sizeof(buffer), tsCheck);
+                      fclose(tsCheck);
+                      
                       if (buffer[0] == 0x47 && buffer[188] == 0x47)
                       {
                          printf("TS file found %s\n", name);
@@ -581,7 +584,12 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                          }
                          
                          //printf("cmd %s\n", output);
-                         if (strstr(output, "PES packet size mismatch"))
+                         
+                         if (strstr(output, "No space left on device"))
+                         {
+                            return RET_FREE_DISK_SPACE_MISSING;
+                         }
+                         else if (strstr(output, "PES packet size mismatch"))
                          {
                             printf("Yes audio needs convertion\n");
                             
@@ -596,6 +604,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                                printf("Not enough disk space to continue, free up %"PRId64" MB additional space\n", missing/(1024*1024));
                                printf("After freeing up space, re-run this program to continue where it left off\n");
                                printf("Output written to %s\n", g_report_filename);
+                               fclose(g_report);
                                exit(10);
                             }
                             
@@ -673,7 +682,6 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                          //printf("NOT ts file\n");
                          status = "not TS file";
                       }
-                      fclose(tsCheck);
                    }
                  }
                  else
@@ -691,7 +699,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                   // print name, then size
                   if (printed_something)
                   {
-                      fputs("\"", g_report); //FIXME(sanitize to JSON)
+                      fputs("\"", g_report);
                       if (item->name.buffer) PrintJsonValueToFile(item->name.buffer, g_report);
                       else PrintJsonValueToFile(item->name.fixed, g_report);
                       fputs("\"", g_report);
@@ -700,6 +708,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                       snprintf(szLargeBuffer, 100, "%"PRIu64, node->size);
                       fputs(szLargeBuffer, g_report);
                       fputs("", g_report);
+                      fflush(g_report);
                   }
               }
               else
@@ -719,6 +728,8 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                   fputs(",\"isDir\":", g_report);
                   if (node->bIsDir) fputs("true", g_report);
                   else fputs("false", g_report);
+                  
+                  fflush(g_report);
               }
 
               if (node->bIsDir == FALSE && C_strendstr(szLargeBuffer, "manifest"))
@@ -743,6 +754,8 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                      fprintf(g_report, ",\"%s\"", status);
                    }
                    status = "old status";
+                   
+                   fflush(g_report);
                 }
               }
               else
@@ -766,6 +779,8 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                  {
                    fprintf(g_report, ",\"status\":\"%s\"", status);
                  }
+                 
+                 fflush(g_report);
               }
 
               if (node->bIsDir && item->childs != NULL)
@@ -790,6 +805,7 @@ static int PrintRecursive(treeItem_T * item, int level, char * szLargeBuffer, un
                 fputs("}\n", g_report);
               }
             
+              fflush(g_report);
               count++;
             }
         }
@@ -835,7 +851,7 @@ int main(int argc, char ** argv)
     char szLargeBuffer[CONVERTER_MAX_PATH] = "";
     genericTree_T genericTree;
     uint64_t totalSize = 0;
-    int iret, ret;
+    int iret, ret, fret = 0;
     
     //show_banner(argc, argv, options);
 
@@ -870,6 +886,19 @@ int main(int argc, char ** argv)
     // to hold directory structure
     genericTree_Constructor(&genericTree);
     
+    // unique report-%H-%M-%S.csv filename
+    {
+        time_t current_time;
+        struct tm * time_info;
+        char timeString[35];
+        
+        time(&current_time);
+        time_info = localtime(&current_time);
+        timeString[sizeof(timeString)-1] = '\0';
+        strftime(timeString, sizeof(timeString)-1, "%Y-%b-%d-%Hh%Mm%S", time_info);
+        snprintf(g_report_filename, sizeof(g_report_filename)-1, "report-%s.csv", timeString);
+    }
+    
     g_report = fopen(g_report_filename, "wb");
 
     iret = traverseDir(g_directory, fileEntryCallback, &genericTree.top, &totalSize, FALSE);
@@ -892,6 +921,11 @@ int main(int argc, char ** argv)
     {
        printf("Attained file limit to process (%d), exiting.\n", g_file_limit);
     }
+    else if (iret == RET_FREE_DISK_SPACE_MISSING)
+    {
+       printf("No more disk space left on device, exiting.\n");
+       fret = 10;
+    }
     
     if (!g_csv)
     {
@@ -901,6 +935,6 @@ int main(int argc, char ** argv)
     genericTree_Destructor(&genericTree);
     fclose(g_report);
     printf("Output written to %s\n", g_report_filename);
-    return 0;
+    return fret;
 }
 
